@@ -86,16 +86,16 @@ public abstract class Entity {
 	private final ArrayList<Effect> launchedEffects = new ArrayList<Effect>();
 
 	// Passive effects
-	private final ArrayList<EffectParameters> passiveEffects = new ArrayList<EffectParameters>();
+	private ArrayList<EffectParameters> passiveEffects = new ArrayList<EffectParameters>();
 
 	// Current cooldowns of the entity
-	protected final Map<Integer, Integer> mCooldown = new TreeMap<Integer, Integer>();
+	protected Map<Integer, Integer> mCooldown = new TreeMap<Integer, Integer>();
 
 	protected int team;
 
 	public State state;
 
-	private final TreeMap<Integer, Chip> mChips = new TreeMap<Integer, Chip>();
+	private TreeMap<Integer, Chip> mChips = new TreeMap<Integer, Chip>();
 
 	private List<Weapon> mWeapons = null;
 	private Weapon weapon = null;
@@ -187,6 +187,36 @@ public abstract class Entity {
 		endTurn();
 	}
 
+	public Entity(Entity entity) {
+
+		mId = entity.getId();
+		this.fight_id = entity.fight_id;
+		name = entity.getName();
+		team = entity.getTeam();
+		mLevel = entity.mLevel;
+		mFarmer = entity.getFarmer();
+		mBuffStats = new Stats(entity.mBuffStats);
+		mBaseStats = new Stats(entity.mBaseStats);
+		mInitialLife = entity.mInitialLife;
+		mTotalLife = entity.mTotalLife;
+		mStatic = entity.mStatic;
+		saysTurn = entity.saysTurn;
+		showsTurn = entity.showsTurn;
+		resurrected = entity.resurrected;
+		this.life = entity.getLife();
+		mWeapons = entity.mWeapons; // immutable
+		mChips = entity.mChips; // immutable
+		this.weapon = entity.weapon;
+		this.cell = entity.cell;
+		this.mCooldown = new TreeMap<Integer, Integer>(entity.mCooldown);
+		this.usedTP = entity.usedTP;
+		this.usedMP = entity.usedMP;
+		this.passiveEffects = entity.passiveEffects; // immutable
+
+		// protected final ArrayList<Effect> effects = new ArrayList<Effect>();
+		// private final ArrayList<Effect> launchedEffects = new ArrayList<Effect>();
+	}
+
 	public Leek getLeek() {
 		return null;
 	}
@@ -264,12 +294,6 @@ public abstract class Entity {
 		}
 		return mFarmerCountry;
 	}
-	public boolean hasMoved() {
-		return mHasMoved;
-	}
-	public void setHasMoved(boolean moved) {
-		mHasMoved = moved;
-	}
 
 	public void addWeapon(Weapon w) {
 		mWeapons.add(w);
@@ -316,6 +340,7 @@ public abstract class Entity {
 
 	public void setTotalLife(int vitality) {
 		mTotalLife = vitality;
+		mInitialLife = life;
 	}
 
 	public int getInitialLife() {
@@ -591,6 +616,8 @@ public abstract class Entity {
 	// and apply effects that affects the entity at the beginning of his turn
 	// (poisons, ...)
 	public void startTurn() {
+
+		applyCoolDown();
 
 		state.statistics.entityTurn(this);
 
@@ -893,8 +920,6 @@ public abstract class Entity {
 
 	public void setLife(int life) {
 		mBaseStats.setStat(CHARAC_LIFE, life);
-		mTotalLife = life;
-		mInitialLife = life;
 		this.life = life;
 	}
 	public void setStrength(int strength) {
@@ -1038,5 +1063,13 @@ public abstract class Entity {
 
 	public void setAIFile(Object aiFile) {
 		this.aiFile = aiFile;
+	}
+
+	public void setRelativeShield(int shield) {
+		this.mBaseStats.setStat(CHARAC_RELATIVE_SHIELD, shield);
+	}
+
+	public void setAbsoluteShield(int shield) {
+		this.mBaseStats.setStat(CHARAC_ABSOLUTE_SHIELD, shield);
 	}
 }

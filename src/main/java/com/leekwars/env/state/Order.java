@@ -14,6 +14,14 @@ public class Order {
 		this.position = 0;
 	}
 
+	public Order(Order order, State state) {
+		this.leeks = new ArrayList<Entity>();
+		this.position = order.position;
+		for (var entity : order.leeks) {
+			this.leeks.add(state.getEntity(entity.getFId()));
+		}
+	}
+
 	public void addEntity(Entity leek) {
 		leeks.add(leek);
 	}

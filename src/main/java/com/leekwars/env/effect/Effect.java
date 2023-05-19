@@ -9,7 +9,7 @@ import com.leekwars.env.state.Entity;
 import com.leekwars.env.state.State;
 import com.leekwars.env.state.Stats;
 
-public abstract class Effect {
+public abstract class Effect implements Cloneable {
 
 	// Effect type constants
 	public final static int TYPE_DAMAGE = 1;
@@ -365,5 +365,22 @@ public abstract class Effect {
 				return Entity.CHARAC_RESISTANCE;
 		}
 		return -1;
+	}
+
+	public Object clone() {
+		try {
+			return super.clone();
+		} catch (CloneNotSupportedException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+
+	public void setTarget(Entity entity) {
+		this.target = entity;
+	}
+
+	public void setCaster(Entity entity) {
+		this.caster = entity;
 	}
 }

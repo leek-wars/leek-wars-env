@@ -27,6 +27,10 @@ public class Actions {
 		this.actions = new ArrayList<Action>();
 	}
 
+	public Actions(Actions actions) {
+		this.actions = new ArrayList<>(actions.actions);
+	}
+
 	public int getEffectId() {
 		return mNextEffectId++;
 	}

@@ -19,10 +19,18 @@ public class Team {
 	private final HashSet<Integer> flags;
 
 	public Team() {
-
 		entities = new ArrayList<Entity>();
 		cooldowns = new TreeMap<Integer, Integer>();
 		flags = new HashSet<Integer>();
+	}
+
+	public Team(Team team, State state) {
+		this.entities = new ArrayList<Entity>();
+		for (var entity : team.entities) {
+			this.entities.add(state.getEntity(entity.getFId()));
+		}
+		this.cooldowns = new TreeMap<Integer, Integer>(team.cooldowns);
+		this.flags = new HashSet<Integer>(team.flags);
 	}
 
 	public Map<Integer, Integer> getCooldowns() {

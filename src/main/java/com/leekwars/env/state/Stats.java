@@ -12,6 +12,10 @@ public class Stats {
 		this.stats = new TreeMap<Integer, Integer>();
 	}
 
+	public Stats(Stats stats) {
+		this.stats = new TreeMap<Integer, Integer>(stats.stats);
+	}
+
 	public int getStat(int stat) {
 		Integer retour = stats.get(stat);
 		if (retour == null)

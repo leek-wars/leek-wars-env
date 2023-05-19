@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 import java.util.TreeMap;
 
 import com.alibaba.fastjson.JSONArray;
@@ -20,6 +22,7 @@ import com.leekwars.env.action.ActionInvocation;
 import com.leekwars.env.action.ActionMove;
 import com.leekwars.env.action.ActionNewTurn;
 import com.leekwars.env.action.ActionResurrect;
+import com.leekwars.env.action.ActionSetWeapon;
 import com.leekwars.env.action.ActionStartFight;
 import com.leekwars.env.action.ActionUseChip;
 import com.leekwars.env.action.ActionUseWeapon;
@@ -112,13 +115,9 @@ public class State {
 
 	private final List<Team> teams;
 	private final List<Entity> initialOrder;
-
 	private int mNextEntityId = 0;
 	private int mWinteam = -1;
-
 	private final java.util.Map<Integer, Entity> mEntities;
-	private final HashMap<Integer, Entity> mEntitiesById;
-
 	private int mId;
 	public int mState = STATE_INIT;
 	private Order order;
@@ -126,20 +125,18 @@ public class State {
 	private int mStartFarmer = -1;
 	private int lastTurn = 0;
 	private Date date;
-
 	private Map map;
 	private final Actions actions;
-
 	private String mLeekDatas = "";
-
 	private int context;
 	private int type;
-
 	public JSONObject custom_map = null;
 	public StatisticsManager statistics;
 	private RegisterManager registerManager;
 	public long executionTime = 0;
 	private int seed = 0;
+
+	private int bestItem;
 
 	public State() {
 
@@ -148,7 +145,6 @@ public class State {
 
 		actions = new Actions();
 
-		mEntitiesById = new HashMap<Integer, Entity>();
 		mEntities = new HashMap<Integer, Entity>();
 
 		type = TYPE_SOLO;
@@ -156,6 +152,58 @@ public class State {
 		fullType = TYPE_SOLO_GARDEN;
 
 		date = new Date();
+	}
+
+	public State(State state) {
+		this.mId = state.mId;
+		this.mState = state.mState;
+		this.actions = new Actions(state.actions);
+		this.randomGenerator = state.randomGenerator;
+
+		mEntities = new HashMap<Integer, Entity>();
+		for (var entity : state.mEntities.entrySet()) {
+			var newEntity = new Leek((Leek) entity.getValue());
+			newEntity.setState(this, entity.getValue().getFId());
+			mEntities.put(entity.getKey(), newEntity);
+		}
+
+		// Effets
+		for (var entity : mEntities.values()) {
+			for (var effet : state.mEntities.get(entity.getFId()).effects) {
+				var newEffect = (Effect) effet.clone();
+				var caster = mEntities.get(newEffect.getCaster().getFId());
+				newEffect.setTarget(entity);
+				newEffect.setCaster(caster);
+				entity.addEffect(newEffect);
+				caster.addLaunchedEffect(newEffect);
+			}
+		}
+
+		this.initialOrder = new ArrayList<Entity>();
+		for (var entity : state.initialOrder) {
+			this.initialOrder.add(mEntities.get(entity.getFId()));
+		}
+		this.order = new Order(state.order, this);
+		this.teams = new ArrayList<>();
+		for (var team : state.teams) {
+			this.teams.add(new Team(team, this));
+		}
+
+		this.map = new Map(state.map, this);
+
+		this.statistics = state.statistics;
+		this.registerManager = state.registerManager;
+		this.fullType = state.fullType;
+		this.type = state.type;
+		this.context = state.context;
+		this.mNextEntityId = state.mNextEntityId;
+		this.mWinteam = state.mWinteam;
+		this.mStartFarmer = state.mStartFarmer;
+		this.lastTurn = state.lastTurn;
+		this.date = state.date;
+		this.mLeekDatas = state.mLeekDatas;
+		this.executionTime = state.executionTime;
+		this.seed = state.seed;
 	}
 
 	public void addFlag(int team, int flag) {
@@ -239,12 +287,7 @@ public class State {
 		teams.get(team).addEntity(entity);
 
 		entity.setState(this, getNextEntityId());
-		mEntitiesById.put(entity.getId(), entity);
 		mEntities.put(entity.getFId(), entity);
-	}
-
-	public Entity getEntityById(int id) {
-		return mEntitiesById.get(id);
 	}
 
 	public List<Entity> getEnemiesEntities(int team) {
@@ -409,7 +452,6 @@ public class State {
 		actions.log(new ActionEntityTurn(current));
 		// Log.i(TAG, "Start turn of " + current.getName());
 
-		current.applyCoolDown();
 		current.startTurn();
 
 		if (!current.isDead()) {
@@ -503,6 +545,7 @@ public class State {
 				if (lastTurn != order.getTurn() && order.getTurn() <= State.MAX_TURNS) {
 					actions.log(new ActionNewTurn(order.getTurn()));
 					lastTurn = order.getTurn();
+					// System.out.println("Turn " + order.getTurn());
 
 					// Battle Royale powers
 					if (type == State.TYPE_BATTLE_ROYALE) {
@@ -526,6 +569,27 @@ public class State {
 	}
 
 	// Attaques; Déplacements...
+	public boolean setWeapon(int entity, Weapon weapon) {
+		return setWeapon(getEntity(entity), weapon);
+	}
+
+	public boolean setWeapon(Entity entity, Weapon weapon) {
+
+		// 1 TP required
+		if (entity.getTP() <= 0) return false;
+
+		entity.setWeapon(weapon);
+		entity.useTP(1);
+		log(new ActionSetWeapon(weapon));
+		this.statistics.setWeapon(entity, weapon);
+
+		return true;
+	}
+
+	public int useWeapon(int launcher, int target) {
+		return useWeapon(getEntity(launcher), getMap().getCell(target));
+	}
+
 	public int useWeapon(Entity launcher, Cell target) {
 
 		if (order.current() != launcher || launcher.getWeapon() == null) {
@@ -555,6 +619,11 @@ public class State {
 		launcher.useTP(weapon.getCost());
 
 		return result;
+	}
+
+	public int useChip(int caster, int targetCell, Chip template) {
+
+		return useChip(getEntity(caster), getMap().getCell(targetCell), template);
 	}
 
 	public int useChip(Entity caster, Cell target, Chip template) {
@@ -627,12 +696,20 @@ public class State {
 		statistics.move(entity, entity, entity.getCell(), path);
 
 		entity.useMP(size);
-		entity.setHasMoved(true);
 		entity.getCell().setPlayer(null);
 		entity.setCell(path.get(path.size() - 1));
 		entity.getCell().setPlayer(entity);
 
 		return path.size();
+	}
+
+	public void moveEntity(Entity entity, Cell cell) {
+
+		if (entity.isStatic()) return; // Static entity cannot move.
+
+		entity.getCell().setPlayer(null);
+		entity.setCell(cell);
+		entity.getCell().setPlayer(entity);
 	}
 
 	public void teleportEntity(Entity entity, Cell cell, Entity caster) {
@@ -644,7 +721,6 @@ public class State {
 		cell.setPlayer(entity);
 
 		statistics.move(caster, entity, start, new ArrayList<>(Arrays.asList(cell)));
-		entity.setHasMoved(true);
 
 		if (start != cell) {
 			entity.onMoved(caster);
@@ -667,7 +743,6 @@ public class State {
 
 			statistics.move(caster, entity, start, Pathfinding.getAStarPath(start, new Cell[] { cell }, Arrays.asList(cell, start)));
 			statistics.slide(entity, caster, start, cell);
-			entity.setHasMoved(true);
 			entity.onMoved(caster);
 		}
 	}
@@ -681,8 +756,6 @@ public class State {
 		if (start == null || end == null) {
 			return;
 		}
-
-		caster.setHasMoved(true);
 
 		target.setCell(start);
 		start.setCellPlayer(target);
@@ -808,7 +881,6 @@ public class State {
 
 		// On ajoute dans les tableaux
 		mEntities.put(invoc.getFId(), invoc);
-		mEntitiesById.put(invoc.getId(), invoc);
 
 		// On ajoute dans l'ordre de jeu
 		order.addSummon(owner, invoc);
@@ -829,7 +901,6 @@ public class State {
 
 		if (force) {
 			mEntities.remove(invoc.getFId());
-			mEntitiesById.remove(invoc.getId());
 		}
 	}
 
@@ -1096,5 +1167,83 @@ public class State {
 
 	public long getSeed() {
 		return this.seed;
+	}
+
+	@Override
+	public String toString() {
+		return "State [\n\t" +
+			String.join("\n\t", this.mEntities.values().stream().map(entity -> {
+				return entity.getName()
+					+ " life=" + entity.getLife() + "/" + entity.getTotalLife()
+					+ " str=" + entity.getStrength()
+					+ " tp=" + entity.getTP()
+					+ " mp=" + entity.getMP()
+					+ " rel_sh=" + entity.getRelativeShield() + "%"
+					+ " abs_sh=" + entity.getAbsoluteShield()
+					+ " pos=" + entity.getCell()
+					+ " armor=" + entity.getCooldown(22)
+					+ " fortress=" + entity.getCooldown(29)
+					;
+			}).collect(Collectors.toList()))
+		+ "\n]";
+	}
+
+	public long moveToward(int entity, long leek_id, long pm_to_use) {
+		return moveToward(getEntity(entity), leek_id, pm_to_use);
+	}
+
+	public long moveToward(Entity entity, long leek_id, long pm_to_use) {
+
+		int pm = pm_to_use == -1 ? entity.getMP() : (int) pm_to_use;
+		if (pm > entity.getMP()) {
+			pm = entity.getMP();
+		}
+		long used_pm = 0;
+		if (pm > 0) {
+			var target = getEntity(leek_id);
+			if (target != null && !target.isDead()) {
+				var path = getMap().getPathBeetween(entity.getCell(), target.getCell(), null);
+				if (path != null) {
+					used_pm = moveEntity(entity, path.subList(0, Math.min(path.size(), pm)));
+				}
+			}
+		}
+		return used_pm;
+	}
+
+	public long moveTowardCell(int entity, long cell_id, long pm_to_use) {
+		return moveTowardCell(getEntity(entity), cell_id, pm_to_use);
+	}
+
+	public long moveTowardCell(Entity entity, long cell_id, long pm_to_use) {
+
+		int pm = pm_to_use == -1 ? entity.getMP() : (int) pm_to_use;
+		if (pm > entity.getMP()) {
+			pm = entity.getMP();
+		}
+		long used_pm = 0;
+		if (pm > 0 && entity.getCell() != null) {
+			Cell target = entity.getCell().getMap().getCell((int) cell_id);
+			if (target != null && target != entity.getCell()) {
+				List<Cell> path = null;
+				if (!target.isWalkable())
+					path = Pathfinding.getAStarPath(entity.getCell(), Pathfinding.getValidCellsAroundObstacle(target), null);
+				else
+					path = getMap().getPathBeetween(entity.getCell(), target, null);
+
+				if (path != null) {
+					used_pm = moveEntity(entity, path.subList(0, Math.min(pm, path.size())));
+				}
+			}
+		}
+		return used_pm;
+	}
+
+	public void setBestItem(int item_id) {
+		this.bestItem = item_id;
+	}
+
+	public int getBestItem() {
+		return this.bestItem;
 	}
 }

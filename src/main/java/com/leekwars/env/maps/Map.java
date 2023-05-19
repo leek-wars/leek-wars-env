@@ -1,7 +1,11 @@
 package com.leekwars.env.maps;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics2D;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -9,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.imageio.ImageIO;
+import javax.swing.ImageIcon;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -200,6 +207,27 @@ public class Map {
 		}
 	}
 
+	public Map(Map map, State state) {
+		this.width = map.width;
+		this.height = map.height;
+		this.nb_cells = map.nb_cells;
+		this.cells = new ArrayList<>();
+		for (var cell : map.cells) {
+			this.cells.add(new Cell(cell, state, this));
+		}
+		this.min_x = map.min_x;
+		this.max_x = map.max_x;
+		this.min_y = map.min_y;
+		this.max_y = map.max_y;
+		int sx = max_x - min_x + 1;
+		int sy = max_y - min_y + 1;
+		this.coord = new Cell[sx][sy];
+		for (int i = 0; i < nb_cells; i++) {
+			Cell c = this.cells.get(i);
+			coord[c.getX() - min_x][c.getY() - min_y] = c;
+		}
+	}
+
 	public int getNbCell() {
 		return nb_cells;
 	}
@@ -228,6 +256,15 @@ public class Map {
 		} catch (ArrayIndexOutOfBoundsException e) {
 			return null;
 		}
+	}
+
+	public Cell getNextCell(Cell cell, int dx, int dy) {
+		var x = cell.x + dx;
+		var y = cell.y + dy;
+		if (x < this.min_x || y < this.min_y || x > this.max_x || y > this.max_y) {
+			return null;
+		}
+		return this.coord[x - this.min_x][y - this.min_y];
 	}
 
 	public Cell[] getObstacles() {
@@ -327,6 +364,17 @@ public class Map {
 		return getCell(tx / entities.size(), ty / entities.size());
 	}
 
+	public Cell getRandomCellAtDistance(Cell cell1, int distance) {
+		var result = new ArrayList<Cell>();
+		for (var cell : cells) {
+			if (cell.isWalkable() && Pathfinding.getCaseDistance(cell, cell1) == distance) {
+				result.add(cell);
+			}
+		}
+		if (result.size() == 0) return null;
+		return result.get((int) (result.size() * Math.random()));
+	}
+
 	public void computeComposantes() {
 		var connexe = new int[this.coord.length][this.coord[0].length];
 		int x, y, x2, y2, ni = 1;
@@ -380,40 +428,56 @@ public class Map {
 		drawMap(new ArrayList<Cell>());
 	}
 
-	public void drawMap(List<Cell> path) {
+	public void drawMap(List<Cell> area) {
 
-		BufferedImage img = new BufferedImage(1600, 1200, BufferedImage.TYPE_INT_RGB);
+		int WIDTH = 1300;
+		int HEIGHT = 1300;
+
+		BufferedImage img = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
 		Graphics2D g2d = (Graphics2D) img.getGraphics();
+		var f = new Font("Roboto", Font.BOLD, 12);
+		g2d.setFont(f);
+		g2d.setBackground(Color.WHITE);
+		g2d.clearRect(0, 0, WIDTH, HEIGHT);
 
-		int larg = 1600 / (max_x - min_x + 1);
-		int lng = 1200 / (max_y - min_y + 1);
+		int larg = WIDTH / (max_x - min_x + 1);
+		int lng = HEIGHT / (max_y - min_y + 1);
 
 		for (int x = 0; x <= (max_x - min_x); x++) {
-			g2d.drawLine(x * larg, 0, x * larg, 1200);
+			g2d.drawLine(x * larg, 0, x * larg, WIDTH);
 		}
 		for (int y = 0; y <= (max_y - min_y); y++) {
-			g2d.drawLine(0, y * lng, 1600, y * lng);
+			g2d.drawLine(0, y * lng, HEIGHT, y * lng);
 		}
 		for (int x = 0; x <= (max_x - min_x); x++) {
 			for (int y = 0; y <= (max_y - min_y); y++) {
 				Cell c = getCell(x + min_x, y + min_y);
 				if (c != null) {
-					if (path.contains(c)) {
-						if (c.available())
-							g2d.setColor(Color.YELLOW);
-						else
+					var textColor = Color.BLACK;
+					if (c.getPlayer() != null) {
+						textColor = Color.WHITE;
+						if (c.getPlayer().getTeam() == 0) {
+							g2d.setColor(Color.BLUE);
+						} else {
+							g2d.setColor(Color.RED);
+						}
+					} else if (area.contains(c)) {
+						if (c.available()) {
+							g2d.setColor(Color.GREEN);
+						} else {
 							g2d.setColor(Color.ORANGE);
-					} else if (!c.available())
-						g2d.setColor(Color.BLUE);
-					else
+						}
+					} else if (!c.available()) {
 						g2d.setColor(Color.GRAY);
+					} else {
+						g2d.setColor(Color.LIGHT_GRAY);
+					}
 					g2d.fillRect(x * larg + 1, y * lng + 1, larg - 1, lng - 1);
 
-					g2d.setColor(Color.WHITE);
+					g2d.setColor(textColor);
 					// g2d.drawString((c.getX() - 17) + "," + c.getY(), x * larg + 2, y * lng + 15);
-					g2d.drawString(c.getId() + " ", x * larg + 2, y * lng + 15);
-
-					g2d.drawString(c.getComposante() + "", x * larg + 2, y * lng + 30);
+					g2d.drawString(c.getId() + " ", x * larg + 6, y * lng + 24);
+					// g2d.drawString(c.getComposante() + "", x * larg + 2, y * lng + 30);
 				}
 			}
 		}
@@ -423,6 +487,23 @@ public class Map {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+
+		JFrame frame = new JFrame("Leek Wars map");
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.getContentPane().add(new JLabel(new ImageIcon(img)), BorderLayout.CENTER);
+		frame.pack();
+		frame.setLocationRelativeTo(null);
+		frame.setVisible(true);
+		frame.addKeyListener(new KeyListener() {
+			@Override
+			public void keyPressed(KeyEvent arg0) {
+				System.exit(0);
+			}
+			@Override
+			public void keyReleased(KeyEvent arg0) {}
+			@Override
+			public void keyTyped(KeyEvent arg0) {}
+		});
 	}
 
 	public void drawPath(List<Cell> path, Cell start, Cell end) {

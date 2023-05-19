@@ -7,26 +7,14 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.leekwars.env.attack.Attack;
 import com.leekwars.env.effect.EffectParameters;
+import com.leekwars.env.items.Item;
 
-public class Weapon {
+public class Weapon extends Item {
 
-	private final int id;
-	private final byte type;
-	private final int cost;
-	private final Attack attack;
-	private final String name;
-	private final int template;
 	private final List<EffectParameters> passiveEffects = new ArrayList<EffectParameters>();
 
-	public Weapon(int id, byte type, int cost, int minRange, int maxRange, JSONArray effects, byte launchType, byte area, boolean los, int template, String name, JSONArray passiveEffects) {
-
-		this.id = id;
-		this.type = type;
-		this.cost = cost;
-		this.name = name;
-		this.template = template;
-
-		attack = new Attack(minRange, maxRange, launchType, area, los, effects, Attack.TYPE_WEAPON, id);
+	public Weapon(int id, int cost, int minRange, int maxRange, JSONArray effects, byte launchType, byte area, boolean los, int template, String name, JSONArray passiveEffects) {
+		super(id, cost, name, template, new Attack(minRange, maxRange, launchType, area, los, effects, Attack.TYPE_WEAPON, id));
 
 		for (Object e : passiveEffects) {
 			JSONObject effect = (JSONObject) e;
@@ -48,10 +36,6 @@ public class Weapon {
 		return template;
 	}
 
-	public byte getType() {
-		return type;
-	}
-
 	public int getCost() {
 		return cost;
 	}
@@ -70,5 +54,10 @@ public class Weapon {
 
 	public boolean isHandToHandWeapon() {
 		return attack.getMinRange() == 1 && attack.getMaxRange() == 1;
+	}
+
+	@Override
+	public String toString() {
+		return name;
 	}
 }

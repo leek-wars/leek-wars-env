@@ -1,6 +1,7 @@
 package com.leekwars.env.maps;
 
 import com.leekwars.env.state.Entity;
+import com.leekwars.env.state.State;
 
 public class Cell {
 
@@ -52,6 +53,25 @@ public class Cell {
 		// On calcule Y
 		this.y = y - x % map.getWidth();
 		this.x = (id - (map.getWidth() - 1) * this.y) / map.getWidth();
+	}
+
+	public Cell(Cell cell, State state, Map map) {
+		this.map = map;
+		this.id = cell.id;
+		this.x = cell.x;
+		this.y = cell.y;
+		this.walkable = cell.walkable;
+		if (cell.getPlayer() != null) {
+			this.player = state.getEntity(cell.getPlayer().getFId());
+			this.player.setCell(this);
+		}
+		this.composante = cell.composante;
+		this.obstacle = cell.obstacle;
+		this.size = cell.size;
+		this.north = cell.north;
+		this.west = cell.west;
+		this.south = cell.south;
+		this.east = cell.east;
 	}
 
 	public boolean hasNorth() {
