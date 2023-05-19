@@ -1093,4 +1093,8 @@ public class State {
 	public void setState(int state) {
 		mState = state;
 	}
+
+	public long getSeed() {
+		return this.seed;
+	}
 }
