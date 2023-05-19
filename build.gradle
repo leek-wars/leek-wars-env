@@ -1,0 +1,33 @@
+apply plugin: 'java'
+
+sourceCompatibility = JavaVersion.VERSION_17
+targetCompatibility = JavaVersion.VERSION_17
+
+sourceSets {
+    test {
+        java {
+            srcDirs = ['src/test/java']
+        }
+        resources {
+            srcDirs = ['src/test/resources']
+        }
+    }
+}
+
+libsDirName = '..'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.12'
+    implementation group: 'com.alibaba', name: 'fastjson', version: '1.1.25'
+}
+
+task tests(type: Exec) {
+    group = "Execution"
+    description = "Run the main class with ExecTask"
+    commandLine "java", "-classpath", sourceSets.test.runtimeClasspath.getAsPath(), "test.TestMain"
+}
+test.dependsOn(tests)
